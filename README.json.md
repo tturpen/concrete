@@ -50,18 +50,18 @@ If going from Concrete, include a concrete filename alone.
 
 Commandline arguments
 ---------------------
--fc,--from-concrete Given a concrete file, print the json
+*-fc,--from-concrete Given a concrete file, print the json
 representation.
--h,--help dislay this help and exit
--jp,--just-passages Given a concrete file, return just the sections
+*-h,--help dislay this help and exit
+*-jp,--just-passages Given a concrete file, return just the sections
 marked as PASSAGE.(not yet implemented)
--js,--just-sentences Given a concrete file, return just the sentences
+*-js,--just-sentences Given a concrete file, return just the sentences
 in json format.(not yet implemented)
--tc,--to-concrete Given a json file (A file that contains a json
+*-tc,--to-concrete Given a json file (A file that contains a json
 string on the first line), save the concrete
 object equivalent.
--uuid,--uuid Specify the exact uuid of the Concrete object.(not
+*-uuid,--uuid Specify the exact uuid of the Concrete object.(not
 yet implemented)
--v,--validate If to-concrete then check the key/value pairs.
+*-v,--validate If to-concrete then check the key/value pairs.
 
 
