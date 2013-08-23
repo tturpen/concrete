@@ -94,47 +94,47 @@ public class JsonUtil {
 		/*
 		 * Subclasses
 		 */
-		private class Body{
+		private class UtilSectionSegmentation{
 			//Body in the intuitive sense as a sequence
 			//of sections
-			private List<BodySection> sections;
+			private List<SegmentSection> sections;
 			
-			public List<BodySection> getSections() {
+			public List<SegmentSection> getSections() {
 				return sections;
 			}
-			public void setSections(List<BodySection> sections) {
+			public void setSections(List<SegmentSection> sections) {
 				this.sections = sections;
 			}
-			public Body(List<BodySection> sects){
+			public UtilSectionSegmentation(List<SegmentSection> sects){
 				this.sections = sects;
 			}
-			public void setAllParagraphs(List<BodySection> sects){
+			public void setAllParagraphs(List<SegmentSection> sects){
 				this.sections = sects;
 			}
-			public void addAllParagraphs(List<BodySection> sects){
-				for(BodySection sect: sects){
+			public void addAllParagraphs(List<SegmentSection> sects){
+				for(SegmentSection sect: sects){
 					this.sections.add(sect);
 				}
 			}
-			public void addParagraph(BodySection sect){
+			public void addParagraph(SegmentSection sect){
 				this.sections.add(sect);
 			}
 		}
 		
-		private class BodySection{
+		private class SegmentSection{
 			//Section in the intuitive sense as a sequence
 			//of sentences
-			private String sectionRawText;
+			private String sectionText;
 			private String kind;
-			private List<BodySectionSentence> sentences;			
+			private List<SegmentSectionSentence> sentences;			
 			
-			public BodySection(String t, String k){
-				this.sectionRawText = t;
+			public SegmentSection(String t, String k){
+				this.sectionText = t;
 				this.kind = k;
 			}
 			
-			public BodySection(String substring, Kind kind2) {
-				this.sectionRawText = substring;
+			public SegmentSection(String substring, Kind kind2) {
+				this.sectionText = substring;
 				this.kind = kind2.name();
 			}
 
@@ -143,10 +143,11 @@ public class JsonUtil {
 			}
 			
 			public String getKind(){return kind;}
+			
 
 			public TextSpan getTextSpan(String rawText) {
-				int start = rawText.indexOf(this.sectionRawText);
-				int end = start + sectionRawText.length();
+				int start = rawText.indexOf(this.sectionText);
+				int end = start + sectionText.length();
 				TextSpan ts = TextSpan.newBuilder()
 						.setStart(start)
 						.setEnd(end)
@@ -154,19 +155,22 @@ public class JsonUtil {
 				return ts;
 			}
 
-			public List<BodySectionSentence> getSentences() {
-				return this.sentences;
+			public List<SegmentSectionSentence> getSentences() {
+				if (this.sentences != null){return this.sentences;}
+				return new ArrayList<SegmentSectionSentence>();
 			}
 
 			public Kind getSectionKind() {
 				if(this.kind.contentEquals("METADATA")){return Concrete.Section.Kind.METADATA;}
 				else if(this.kind.contentEquals("PASSAGE")){return Concrete.Section.Kind.PASSAGE;}
+				else if(this.kind.contentEquals("IMAGE")){return Concrete.Section.Kind.IMAGE;}
+				else if(this.kind.contentEquals("LIST")){return Concrete.Section.Kind.LIST;}
+				else if(this.kind.contentEquals("TABLE")){return Concrete.Section.Kind.TABLE;}
 				else {return Concrete.Section.Kind.OTHER;}
 			}
 		}
 		
-		private class EventSpan{
-			
+		private class EventSpan{			
 			//A string for the type of event
 			private String eventType;
 			
@@ -198,13 +202,16 @@ public class JsonUtil {
 		}
 		
 		
-		private class BodySectionSentence{
+		private class SegmentSectionSentence{
 			//Sentence as the atomic unit of the JsonCommunication
 			//Not currently supported
 			//Class
 			private String text = "";
 			public void setText(String text){
 				this.text = text;
+			}
+			public SegmentSectionSentence(){
+				this.text = "";
 			}
 		}	
 		
@@ -239,6 +246,17 @@ public class JsonUtil {
 		public String getKind() {
 			return kind;
 		}
+		
+		public Communication.Kind getKindCommunication() {
+			if (kind.contentEquals("EMAIL")){ return Communication.Kind.EMAIL;}
+			else if (kind.contentEquals("NEWS")){ return Communication.Kind.NEWS;}
+			else if (kind.contentEquals("WIKIPEDIA")){ return Communication.Kind.WIKIPEDIA;}
+			else if (kind.contentEquals("TWEET")){ return Communication.Kind.TWEET;}
+			else if (kind.contentEquals("PHONE_CALL")){ return Communication.Kind.PHONE_CALL;}
+			else if (kind.contentEquals("USENET")){ return Communication.Kind.USENET;}
+			else if (kind.contentEquals("BLOG")){ return Communication.Kind.BLOG;}			
+			else { return Communication.Kind.OTHER;}
+		}
 
 
 		public void setKind(String kind) {
@@ -260,7 +278,7 @@ public class JsonUtil {
 		 */
 		private String rawText;//The raw byte->String of the email
 		private String bodyText;//The byte->String->Mime message->getText(Mime message)
-		private List<Body> bodyChain = new ArrayList<Body>();//A list of the email messages contained in emailBodyText	
+		private List<UtilSectionSegmentation> segmentations = new ArrayList<UtilSectionSegmentation>();//A list of the email messages contained in emailBodyText	
 		private List<JsonKeyValues> metadata = new ArrayList<JsonKeyValues>();
 
 		private List<EventSpan> eventSpans = new ArrayList<EventSpan>(); // A list of the events in the text, grounded in character spans 
@@ -269,7 +287,7 @@ public class JsonUtil {
 			List<String> acceptedKeys = new ArrayList <String>();
 			acceptedKeys.add("rawText");
 			acceptedKeys.add("bodyText");
-			acceptedKeys.add("bodyChain");
+			acceptedKeys.add("segmentations");
 			acceptedKeys.add("author");
 			acceptedKeys.add("title");
 			acceptedKeys.add("startTime");
@@ -278,6 +296,8 @@ public class JsonUtil {
 			acceptedKeys.add("recipientsCc");
 			acceptedKeys.add("recipientsBcc");
 			acceptedKeys.add("messageId");
+			acceptedKeys.add("kind");
+			acceptedKeys.add("eventSpans");
 			return acceptedKeys;
 		}
 		
@@ -332,14 +352,14 @@ public class JsonUtil {
 		 * @param rawText
 		 * @return the Body object that represents the rawText
 		 */
-		private Body sectionsToBody(List<Section> sections,String rawText) {
+		private UtilSectionSegmentation sectionsToUtilSectionSegmentation(List<Section> sections,String rawText) {
 			//List<Section> sections = seg.getSectionList();
-			List<BodySection> bodySections = new ArrayList<BodySection>();			
+			List<SegmentSection> textSections = new ArrayList<SegmentSection>();			
 			for(Section sec: sections){
 				TextSpan ts = sec.getTextSpan();
-				bodySections.add(new BodySection(rawText.substring(ts.getStart(),ts.getEnd()),sec.getKind()));
+				textSections.add(new SegmentSection(rawText.substring(ts.getStart(),ts.getEnd()),sec.getKind()));
 			}
-			return new Body(bodySections);
+			return new UtilSectionSegmentation(textSections);
 		}
 		
 		/**
@@ -348,12 +368,12 @@ public class JsonUtil {
 		 * @param rawText
 		 * @return the Body object that represents the rawText
 		 */
-		private SectionSegmentation emailBodyToSegment(Body body,String rawText) {
+		private SectionSegmentation emailBodyToSegment(UtilSectionSegmentation body,String rawText) {
 			//List<Section> sections = seg.getSectionList();
-			List<BodySection> bodySections = body.getSections();
+			List<SegmentSection> bodySections = body.getSections();
 			
 			List<Section> sections = new ArrayList<Section>();			
-			for(BodySection bodySec: bodySections){
+			for(SegmentSection bodySec: bodySections){
 				TextSpan ts = bodySec.getTextSpan(rawText);
 				sections.add(Concrete.Section.newBuilder()
 						.setTextSpan(ts)
@@ -494,27 +514,27 @@ public class JsonUtil {
 		
 		public void setBodyText() {
 			String text = "";
-			for(Body b: this.bodyChain){
-				for(BodySection bs: b.sections){
-					text += bs.sectionRawText+"\n";
+			for(UtilSectionSegmentation b: this.segmentations){
+				for(SegmentSection bs: b.sections){
+					text += bs.sectionText+"\n";
 				}
 			}
 			this.bodyText = text;
 		}
 		
-		public List<Body> getBodyChain() {
-			return bodyChain;
+		public List<UtilSectionSegmentation> getBodyChain() {
+			return segmentations;
 		}
-		public void setBodyChain(List<Body> emailChain) {
-			this.bodyChain = emailChain;
+		public void setBodyChain(List<UtilSectionSegmentation> emailChain) {
+			this.segmentations = emailChain;
 		}
-		public void setBodyChain(Body body) {
-			this.bodyChain = new ArrayList<Body>();
-			this.bodyChain.add(body);
+		public void setBodyChain(UtilSectionSegmentation body) {
+			this.segmentations = new ArrayList<UtilSectionSegmentation>();
+			this.segmentations.add(body);
 		}
 		public void addSectionToChain(List<Section> sec, String rawText){
-			Body body = sectionsToBody(sec,rawText);
-			this.bodyChain.add(body);
+			UtilSectionSegmentation body = sectionsToUtilSectionSegmentation(sec,rawText);
+			this.segmentations.add(body);
 		}
 		public JsonObject toJsonObject(){
 			Gson gson = new Gson();
@@ -635,9 +655,9 @@ public class JsonUtil {
 		}
 
 
-		public List<Body> getListOfSectionsAsBodyChain(
+		public List<UtilSectionSegmentation> getListOfSectionsAsBodyChain(
 				Object value) {
-			Type listType = new TypeToken<List<Body>>(){}.getType();
+			Type listType = new TypeToken<List<UtilSectionSegmentation>>(){}.getType();
 			JsonArray ja = (JsonArray)value;
 			
 			Gson gson = new Gson();
@@ -662,7 +682,7 @@ public class JsonUtil {
 
 		public Iterable<? extends SectionSegmentation> getConcreteEmailSectionSegmentation() {
 			List<SectionSegmentation> sectSeg = new ArrayList<SectionSegmentation>();
-			for(Body b: bodyChain){
+			for(UtilSectionSegmentation b: segmentations){
 				sectSeg.add(emailBodyToSegment(b,this.rawText));
 			}
 			return sectSeg;
@@ -671,10 +691,10 @@ public class JsonUtil {
 
 		public List<String> getSents() {
 			List<String> sents = new ArrayList<String>();
-			for(Body b: this.bodyChain){
-				for(BodySection bs: b.sections){
+			for(UtilSectionSegmentation b: this.segmentations){
+				for(SegmentSection bs: b.sections){
 					if(bs.getKind().contentEquals("PASSAGE")){
-						for(BodySectionSentence bss: bs.getSentences()){
+						for(SegmentSectionSentence bss: bs.getSentences()){
 							sents.add(bss.text);
 						}
 					}
@@ -690,6 +710,42 @@ public class JsonUtil {
 			}
 			return kvs;
 		}
+
+		public Iterable<? extends SituationMentionSet> getSituationMentionSet() {
+			//I don't know what the EventSpans look like, I would need some conrete objects with EventSpans
+			//to finish this code
+			List<EventSpan> events = this.eventSpans;
+			for(EventSpan es : events){
+				String type = es.eventType;
+				List<ArgumentSpan> arguments = es.arguments;
+				for(ArgumentSpan a : arguments){
+					String role = a.role;
+					List<Span> spans = a.spans;
+					for(Span s : spans){
+						int start = s.start;
+						int end = s.end;
+					}
+				}
+				
+			}
+			return null;
+		}
+		public void addStringRecipientsTo(List<String> values) {
+			for (String v : values){
+				if (v != null){	this.recipientsTo.add(v);}
+			}
+		}
+		public void addStringRecipientsCc(List<String> values) {
+			for (String v : values){
+				if (v != null){	this.recipientsCc.add(v);}
+			}
+		}
+		public void addStringRecipientsBcc(List<String> values) {
+			for (String v : values){
+				if (v != null){	this.recipientsBcc.add(v);}
+			}
+		}
+
 	}
 	/*
 	 * Handler Methods
@@ -762,11 +818,12 @@ public class JsonUtil {
 		
 		//Get data members
 		String rawText = commIn.getText();
+
 		List<SectionSegmentation> segs = commIn.getSectionSegmentationList();
 		if (segs.size() > 0){
 			//Get first sectionsegmentation hypothesis
 			List<Section> sections = segs.get(0).getSectionList();
-			jcomm.setBodyChain(jcomm.sectionsToBody(sections,rawText));
+			jcomm.setBodyChain(jcomm.sectionsToUtilSectionSegmentation(sections,rawText));
 		}
 		//SectionSegmentation headers = segs.get(0);//Header text is written as first secseg
 		
@@ -835,8 +892,8 @@ public class JsonUtil {
 		for(Entry e: es){
 			key = (String)e.getKey();
 			if (acceptedKeys.contains(key)){
-				if(key.contentEquals("bodyChain")){
-					//handle an array of arrays
+				if(key.contentEquals("segmentations")){
+					//Given a list of segmentations, add them as a chain of texts
 					if(validate){validKeys.add(key);}
 					ja = (JsonArray)e.getValue();
 					jcomm.setBodyChain(jcomm.getListOfSectionsAsBodyChain(e.getValue()));
@@ -844,6 +901,10 @@ public class JsonUtil {
 				else if(key.contentEquals("metadata")){
 					jcomm.addMetadata(jcomm.getPriorMetadataAsKeyValuePairs(e.getValue()));
 				}
+				//Talk to Dave about event spans so I can finish this code
+				//else if(key.contentEquals("eventSpans")){
+				//	jcomm.addEventSpans(jcomm.get, communication)
+				//}
 				else{
 					//Else extract the values
 					values = fromJsonStringToValueStringList(e.getValue());//(List<String>)e.getValue();
@@ -869,6 +930,22 @@ public class JsonUtil {
 					}
 					else if(key.contentEquals("messageId")){
 						jcomm.setMessageId(values.get(0));
+						if(validate){ validKeys.add(key);};
+					}
+					else if(key.contentEquals("kind")){
+						jcomm.setKind(values.get(0));
+						if(validate){ validKeys.add(key);};
+					}
+					else if(key.contentEquals("recipientsTo")){
+						if (values.size() > 0){ jcomm.addStringRecipientsTo(values);}
+						if(validate){ validKeys.add(key);};
+					}
+					else if(key.contentEquals("recipientsCc")){
+						if (values.size() > 0){jcomm.addStringRecipientsCc(values);}
+						if(validate){ validKeys.add(key);};
+					}
+					else if(key.contentEquals("recipientsBcc")){
+						if (values.size() > 0){	jcomm.addStringRecipientsBcc(values);}
 						if(validate){ validKeys.add(key);};
 					}
 				}
@@ -1064,6 +1141,33 @@ public class JsonUtil {
 	}
 	
 	/**
+	 * Convert the JsonCommunication object to a protobuf Communication object
+	 * 
+	 * @param jcomm the JsonCommunication object
+	 * @return the Communication object
+	 */
+	public static Communication toConcreteCommunication(JsonCommunication jcomm){
+		Communication cb = new ProtoFactory().generateMockCommunication();
+		Builder comm = cb.toBuilder()
+				.setText(jcomm.getRawText())
+				.setStartTime(jcomm.getStartTime());
+		if (jcomm.getKind().contentEquals("EMAIL")){
+			comm.setEmailInfo(EmailCommunicationInfo.newBuilder()
+					.setSenderAddress(jcomm.getConcreteAuthor())
+					.setMessageId(jcomm.getMessageId())
+					.addAllToAddress(jcomm.getConcreteRecipientsTo())
+					.addAllBccAddress(jcomm.getConcreteRecipientsBcc())
+					.addAllCcAddress(jcomm.getConcreteRecipientsCc()));
+		}
+		comm.addAllMetadata(jcomm.getConcreteMetadata())
+				.addAllSectionSegmentation(jcomm.getConcreteEmailSectionSegmentation())
+				.setKind(jcomm.getKindCommunication())
+				//.addAllSituationMentionSet(jcomm.getSituationMentionSet())
+				.build();
+		return comm.build();		
+	}
+	
+	/**
 	 * Given a string representation of a JsonCommunication
 	 * convert the communication to the jcomm and return the
 	 * protobuf communication object.
@@ -1086,7 +1190,7 @@ public class JsonUtil {
 	public static void saveConcrete(JsonCommunication jcomm, String outFilename) throws IOException{
 		//File outputFile = new File(outFilename);
 		ProtocolBufferWriter pbf = new ProtocolBufferWriter(outFilename);
-		Communication comm = toConcreteEmail(jcomm);
+		Communication comm = toConcreteCommunication(jcomm);//toConcreteEmail(jcomm);
 		try{
 			pbf.write(comm);
 			pbf.close();
